@@ -1,0 +1,108 @@
+version: '2'
+
+services:
+  db:
+    build: ./db
+    restart: always
+    mem_limit: 500m
+    env_file:
+      - ".env"
+    environment:
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+    #ports:
+      #- 3306:3306
+    volumes:
+      - ./db/var/lib/mysql/:/var/lib/mysql
+      - ${DOCKER_ROOT_PATH}/service_configs//mysql/conf.d/:/etc/mysql/conf.d/
+    depends_on:
+      - memcached
+    container_name: db
+  phpmyadmin:
+    image:
+      phpmyadmin/phpmyadmin
+    #ports:
+      #- 8081:80
+    env_file:
+      - ".env"
+    container_name: phpmyadmin
+    depends_on:
+      - db
+  djangoblog:
+    build: ./djangoblog/
+    restart: always
+    mem_limit: 500m
+    env_file:
+      - ".env"
+    command:  bash -c  'sh /code/DjangoBlog/bin/docker_start.sh'
+    volumes:
+      - ${DOCKER_ROOT_PATH}/DjangoBlog/:/code/DjangoBlog
+      - ${DOCKER_ROOT_PATH}/resource:/var/www/resource/
+    #ports:
+     # - "8000:8000"
+    links:
+      - db
+    depends_on:
+      - db
+    container_name: djangoblog
+  xiaobiaobai:
+    build: ./xiaobiaobai/
+    restart: always
+    mem_limit: 500m
+    env_file:
+      - ".env"
+    command:  bash -c  'sh /code/xiaobiaobai.api/bin/docker_start.sh'
+    volumes:
+      - ${DOCKER_ROOT_PATH}/xiaobiaobai.api/:/code/xiaobiaobai.api
+      - ${DOCKER_ROOT_PATH}/resource:/var/www/resource/
+    #ports:
+     # - "8000:8000"
+    links:
+      - db
+    depends_on:
+      - db
+    container_name: xiaobiaobai
+  wordpress:
+    build: ./wordpress
+    restart: always
+    mem_limit: 100m
+    #ports:
+      #- "9001:9000"
+    env_file:
+      - ".env"
+    volumes:
+      - ${DOCKER_ROOT_PATH}/wordpress:/wordpress
+      - ${DOCKER_ROOT_PATH}/service_configs/php/usr/local/etc/:/usr/local/etc/
+    links:
+      - db
+    depends_on:
+      - db
+    container_name: wordpress
+  nginx:
+    restart: always
+    build: ./nginx/
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ${DOCKER_ROOT_PATH}/service_configs/ssl/lylinux.net/:/letsencrypt/
+      - ${DOCKER_ROOT_PATH}/service_configs/nginx/:/etc/nginx
+      - ${DOCKER_ROOT_PATH}/resource:/resource/
+      - /home/lixiao/depolyfile/deploy:/home/lixiao/depolyfile/deploy
+      - ${DOCKER_ROOT_PATH}/logs/nginx:/var/log/nginx/
+    volumes_from:
+      - djangoblog
+      - wordpress
+      - xiaobiaobai
+    links:
+      - djangoblog:djangoblog
+      - wordpress:wordpress
+      - phpmyadmin:phpmyadmin
+      - xiaobiaobai:xiaobiaobai
+    container_name: nginx
+  memcached:
+    build: ./memcached/
+    container_name: memcached
+
